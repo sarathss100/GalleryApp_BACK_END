@@ -8,6 +8,7 @@ import { IUser } from "../../model/user.model";
 import { Token } from "../../utils/tokenUtility";
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import SignupFormSchema from "../../schemas/SignupFormSchema";
+import SigninFormSchema from "../../schemas/SigninFormSchema";
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -232,11 +233,22 @@ class UserController implements IUserController {
 
     async signin(req: Request, res: Response): Promise<void> {
         try {
-            const { email, password } = req.body;
-            if (!email || !password) {
-                res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "Email and password are required" });
+            const parsed = SigninFormSchema.safeParse(req.body);
+
+            if (!parsed.success) {
+                const errorMessages = parsed.error.issues.map(err => ({
+                    field: err.path[0],
+                    message: err.message
+                }));
+                res.status(STATUS_CODES.BAD_REQUEST).json({
+                    success: false,
+                    errors: errorMessages
+                });
                 return;
             }
+
+            const { email, password } = parsed.data;
+
             const userExists = await this._userService.findByEmail(email);
             if (!userExists?.isVerified) {
                 res.status(STATUS_CODES.UNAUTHORIZED).json({ success: false, message: "Cache Not Verified" });
