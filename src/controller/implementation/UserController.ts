@@ -7,6 +7,7 @@ import MailUtility from "../../utils/mailUtilits";
 import { IUser } from "../../model/user.model";
 import { Token } from "../../utils/tokenUtility";
 import jwt, { JwtPayload } from 'jsonwebtoken'
+import SignupFormSchema from "../../schemas/SignupFormSchema";
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -18,14 +19,22 @@ class UserController implements IUserController {
 
     async signup(req: Request, res: Response): Promise<void> {
         try {
-            const { username, email, phoneNumber } = req.body;
+            const parsed = SignupFormSchema.safeParse(req.body);
 
-            let { password } = req.body;
-
-            if (!username || !email || !phoneNumber || !password) {
-                res.status(STATUS_CODES.BAD_REQUEST).json({ success: false, message: "All fields are required" });
+            if (!parsed.success) {
+                const errorMessages = parsed.error.issues.map(err => ({
+                    field: err.path[0],
+                    message: err.message
+                }));
+                res.status(STATUS_CODES.BAD_REQUEST).json({
+                    success: false,
+                    errors: errorMessages
+                });
                 return;
             }
+
+            const { username, email, phoneNumber } = parsed.data;
+            let { password } = parsed.data;
 
             const existingUser = await this._userService.findByEmail(email);
 
@@ -39,15 +48,15 @@ class UserController implements IUserController {
                 return;
             }
 
-            const userPhoneNumberExist = await this._userService.findByPhoneNumber(phoneNumber);
+            const phone_number = parseInt(phoneNumber);
 
+            const userPhoneNumberExist = await this._userService.findByPhoneNumber(phone_number);
             if (userPhoneNumberExist) {
                 res.status(STATUS_CODES.CONFLICT).json({ success: false, message: "User with this phone number already exists" });
                 return;
             }
 
             const hashedPassword = await PasswordUtils.passwordHash(password);
-
             if (!hashedPassword) {
                 res.status(STATUS_CODES.INTERNAL_SERVER_ERROR).json({ success: false, message: "Error hashing password" });
                 return;
