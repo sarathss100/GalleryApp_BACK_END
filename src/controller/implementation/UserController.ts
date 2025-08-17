@@ -135,6 +135,7 @@ class UserController implements IUserController {
                 path: '/',
                 maxAge: 7 * 24 * 60 * 60 * 1000,
             });
+            
             res.cookie("accessToken", accessToken, {
                 httpOnly: true,
                 secure: isProduction,
